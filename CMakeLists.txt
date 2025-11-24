@@ -63,7 +63,7 @@ endif()
 if(FINISH_PUBLISHER)
   add_executable(serial_relay_node src/msg_publisher.cpp)
   target_link_libraries(serial_relay_node PRIVATE lib_serial_receiver)
-  ament_target_dependencies(serial_relay_node PUBLIC ${THIRD_DEPS})
+  ament_target_dependencies(serial_relay_node PUBLIC ${ROS_DEPS})
 endif()
 
 ament_package()
