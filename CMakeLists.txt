@@ -13,8 +13,9 @@ set(CMAKE_BUILD_DIR build)
 set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g -ggdb")
 set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG")
 
-set(FINISH_RECEIVER OFF)
-set(TEST_RECEIVER OFF)
+# 设置为ON，编译接收器和测试程序
+set(FINISH_RECEIVER ON)
+set(TEST_RECEIVER ON)
 set(FINISH_PUBLISHER OFF)
 
 add_compile_options(-Wall -Wpedantic -Wextra)
@@ -24,6 +25,10 @@ find_package(Boost REQUIRED COMPONENTS system)
 find_package(spdlog REQUIRED)
 find_package(fmt REQUIRED)
 find_package(rclcpp REQUIRED)
+
+# 使用pkg-config查找libserial
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(LIBSERIAL REQUIRED libserial)
 
 set(THIRD_DEPS
   Boost::system
@@ -35,35 +40,20 @@ set(ROS_DEPS
   rclcpp
 )
 
-include_directories(include)
+# 添加libserial的包含目录
+include_directories(include ${LIBSERIAL_INCLUDE_DIRS})
 
 add_executable(serial_sender src/serial_sender.cpp)
-target_link_libraries(serial_sender PRIVATE ${THIRD_DEPS})
+target_link_libraries(serial_sender PRIVATE ${THIRD_DEPS} ${LIBSERIAL_LIBRARIES})
 
-if(TEST_RECEIVER AND NOT FINISH_RECEIVER)
-  message(WARNING "TEST_RECEIVER requires FINISH_RECEIVER. Disabling TEST_RECEIVER.")
-  set(TEST_RECEIVER OFF)
-endif()
+# serial_receiver库
+add_library(lib_serial_receiver STATIC src/serial_receiver.cpp)
+target_link_libraries(lib_serial_receiver PUBLIC ${THIRD_DEPS} ${LIBSERIAL_LIBRARIES})
+target_include_directories(lib_serial_receiver PUBLIC ${LIBSERIAL_INCLUDE_DIRS})
 
-if(FINISH_PUBLISHER AND NOT FINISH_RECEIVER)
-  message(WARNING "FINISH_PUBLISHER requires FINISH_RECEIVER. Disabling FINISH_PUBLISHER.")
-  set(FINISH_PUBLISHER OFF)
-endif()
-
-if(FINISH_RECEIVER)
-  add_library(lib_serial_receiver STATIC src/serial_receiver.cpp)
-  target_link_libraries(lib_serial_receiver PUBLIC ${THIRD_DEPS})
-endif()
-
-if(TEST_RECEIVER)
-  add_executable(test_serial_receiver src/test_serial_receiver.cpp)
-  target_link_libraries(test_serial_receiver PRIVATE lib_serial_receiver)
-endif()
-
-if(FINISH_PUBLISHER)
-  add_executable(serial_relay_node src/msg_publisher.cpp)
-  target_link_libraries(serial_relay_node PRIVATE lib_serial_receiver)
-  ament_target_dependencies(serial_relay_node PUBLIC ${ROS_DEPS})
-endif()
+# 测试程序
+add_executable(test_serial_receiver src/test_serial_receiver.cpp)
+target_link_libraries(test_serial_receiver PRIVATE lib_serial_receiver ${THIRD_DEPS} ${LIBSERIAL_LIBRARIES})
+target_include_directories(test_serial_receiver PRIVATE ${LIBSERIAL_INCLUDE_DIRS})
 
 ament_package()
